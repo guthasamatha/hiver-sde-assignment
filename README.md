@@ -422,5 +422,5 @@ requiring GPU training.
 ### 1. Clone the Repository
 
 ```bash
-git clone <REPOSITORY_URL>
+git clone https://github.com/guthasamatha/hiver-sde-assignment.git
 cd hiver-sde-assignment
