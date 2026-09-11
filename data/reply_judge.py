@@ -23,7 +23,7 @@ if not API_KEY:
 
 # API key is sent in the header, NOT inside the URL
 URL = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{MODEL}:generateContent"
 )
 
@@ -49,16 +49,22 @@ print(f"Model: {MODEL}")
 # ==========================================
 
 if os.path.exists(OUTPUT_FILE):
+
     previous_df = pd.read_csv(OUTPUT_FILE)
+
     results = previous_df.to_dict("records")
 
     completed_messages = set(
         previous_df["customer_message"].astype(str)
     )
 
-    print(f"Previous completed results found: {len(results)}")
+    print(
+        f"Previous completed results found: "
+        f"{len(results)}"
+    )
 
 else:
+
     results = []
     completed_messages = set()
 
@@ -68,7 +74,12 @@ else:
 # LLM JUDGE FUNCTION
 # ==========================================
 
-def judge_reply(customer_message, historical_reply, draft_reply):
+
+def judge_reply(
+    customer_message,
+    historical_reply,
+    draft_reply
+):
 
     prompt = f"""
 You are evaluating an AI customer-support reply for Spotify.
@@ -137,7 +148,8 @@ Return ONLY valid JSON in exactly this structure:
             }
         ],
         "generationConfig": {
-            "temperature": 0
+            "temperature": 0,
+            "responseMimeType": "application/json"
         }
     }
 
@@ -145,6 +157,7 @@ Return ONLY valid JSON in exactly this structure:
     for attempt in range(5):
 
         try:
+
             response = requests.post(
                 URL,
                 headers=HEADERS,
@@ -152,38 +165,60 @@ Return ONLY valid JSON in exactly this structure:
                 timeout=60
             )
 
-            # ------------------------------------------
+            # ======================================
             # RATE LIMIT
-            # ------------------------------------------
+            # ======================================
 
             if response.status_code == 429:
 
                 wait_time = 20 * (attempt + 1)
 
                 print(
-                    f"Rate limit reached. "
+                    "Rate limit reached. "
                     f"Waiting {wait_time} seconds..."
                 )
 
                 time.sleep(wait_time)
                 continue
 
-            # ------------------------------------------
+            # ======================================
             # OTHER API ERROR
-            # ------------------------------------------
+            # ======================================
 
             if not response.ok:
 
                 print(
-                    f"API error: HTTP {response.status_code}"
+                    f"API error: HTTP "
+                    f"{response.status_code}"
                 )
+
+                print("Gemini error details:")
+
+                # This lets us see the real API error
+                # without exposing the API key.
+                try:
+                    error_data = response.json()
+                    print(
+                        json.dumps(
+                            error_data,
+                            indent=2
+                        )
+                    )
+
+                except ValueError:
+                    print(response.text)
+
+                # HTTP 400 normally means retrying the
+                # identical request will not fix it.
+                if response.status_code == 400:
+                    return None
 
                 time.sleep(10)
                 continue
 
-            # ------------------------------------------
+            # ======================================
             # SUCCESS
-            # ------------------------------------------
+            # ======================================
 
             result = response.json()
 
@@ -194,15 +229,28 @@ Return ONLY valid JSON in exactly this structure:
 
             text = text.strip()
 
-            # Remove Markdown fences if Gemini returns them
+            # Remove Markdown fences if Gemini
+            # unexpectedly returns them
             if text.startswith("```"):
-                text = text.replace("```json", "")
-                text = text.replace("```", "")
+
+                text = text.replace(
+                    "```json",
+                    ""
+                )
+
+                text = text.replace(
+                    "```",
+                    ""
+                )
+
                 text = text.strip()
 
             scores = json.loads(text)
 
-            # Make sure scores are valid
+            # ======================================
+            # VALIDATE SCORES
+            # ======================================
+
             required_scores = [
                 "relevance",
                 "groundedness",
@@ -213,11 +261,15 @@ Return ONLY valid JSON in exactly this structure:
 
             for score_name in required_scores:
 
-                score = int(scores[score_name])
+                score = int(
+                    scores[score_name]
+                )
 
                 if score < 1 or score > 5:
+
                     raise ValueError(
-                        f"Invalid {score_name} score: {score}"
+                        f"Invalid {score_name} "
+                        f"score: {score}"
                     )
 
                 scores[score_name] = score
@@ -233,7 +285,8 @@ Return ONLY valid JSON in exactly this structure:
 
             print(
                 f"Attempt {attempt + 1} failed: "
-                f"{type(error).__name__}"
+                f"{type(error).__name__}: "
+                f"{error}"
             )
 
             time.sleep(10)
@@ -247,20 +300,24 @@ Return ONLY valid JSON in exactly this structure:
 
 for index, row in df.iterrows():
 
-    customer_message = str(row["customer_message"])
+    customer_message = str(
+        row["customer_message"]
+    )
 
     # Skip examples already successfully judged
     if customer_message in completed_messages:
 
         print(
             f"Skipping {index + 1}/{len(df)} "
-            f"(already completed)"
+            "(already completed)"
         )
 
         continue
 
     print()
-    print(f"Judging {index + 1}/{len(df)}...")
+    print(
+        f"Judging {index + 1}/{len(df)}..."
+    )
 
     scores = judge_reply(
         customer_message,
@@ -275,29 +332,56 @@ for index, row in df.iterrows():
     if scores is not None:
 
         result = {
-            "customer_message": row["customer_message"],
-            "draft_reply": row["draft_reply"],
+            "customer_message":
+                row["customer_message"],
 
-            "human_relevance": row["human_relevance"],
-            "human_groundedness": row["human_groundedness"],
-            "human_helpfulness": row["human_helpfulness"],
-            "human_style": row["human_style"],
-            "human_safety": row["human_safety"],
+            "draft_reply":
+                row["draft_reply"],
 
-            "llm_relevance": scores["relevance"],
-            "llm_groundedness": scores["groundedness"],
-            "llm_helpfulness": scores["helpfulness"],
-            "llm_style": scores["style"],
-            "llm_safety": scores["safety"],
+            "human_relevance":
+                row["human_relevance"],
 
-            "llm_reason": scores.get("reason", "")
+            "human_groundedness":
+                row["human_groundedness"],
+
+            "human_helpfulness":
+                row["human_helpfulness"],
+
+            "human_style":
+                row["human_style"],
+
+            "human_safety":
+                row["human_safety"],
+
+            "llm_relevance":
+                scores["relevance"],
+
+            "llm_groundedness":
+                scores["groundedness"],
+
+            "llm_helpfulness":
+                scores["helpfulness"],
+
+            "llm_style":
+                scores["style"],
+
+            "llm_safety":
+                scores["safety"],
+
+            "llm_reason":
+                scores.get(
+                    "reason",
+                    ""
+                )
         }
 
         results.append(result)
 
-        completed_messages.add(customer_message)
+        completed_messages.add(
+            customer_message
+        )
 
-        # Save immediately after every successful example
+        # Save immediately after every success
         pd.DataFrame(results).to_csv(
             OUTPUT_FILE,
             index=False
@@ -308,11 +392,11 @@ for index, row in df.iterrows():
     else:
 
         print(
-            f"Could not judge example {index + 1} "
-            f"after retries."
+            f"Could not judge example "
+            f"{index + 1}."
         )
 
-    # Longer delay to reduce free-tier rate limits
+    # Small delay between requests
     time.sleep(5)
 
 
@@ -332,7 +416,9 @@ print(
     f"{len(result_df)}/{len(df)}"
 )
 
-print(f"Saved: {OUTPUT_FILE}")
+print(
+    f"Saved: {OUTPUT_FILE}"
+)
 
 # ==========================================
 # AVERAGE SCORES
@@ -364,18 +450,24 @@ if len(result_df) > 0:
 if len(result_df) == len(df):
 
     print()
-    print("SUCCESS: All 30 examples were judged.")
+    print(
+        "SUCCESS: All 30 examples "
+        "were judged."
+    )
 
 else:
 
-    remaining = len(df) - len(result_df)
+    remaining = (
+        len(df) - len(result_df)
+    )
 
     print()
     print(
-        f"{remaining} examples are still missing."
+        f"{remaining} examples "
+        "are still missing."
     )
 
     print(
-        "You can run this script again later. "
-        "Completed examples will be skipped."
+        "Completed examples are preserved "
+        "and will be skipped on the next run."
     )

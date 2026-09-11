@@ -17,19 +17,25 @@ The project focuses not only on building the agent but also on evaluating
 its limitations using a hand-reviewed golden set, automated metrics,
 manual reply evaluation, and an LLM-as-a-Judge.
 
+---
+
 ## System Flow
 
-Customer Message  
-↓  
-Intent Classification  
-↓  
-Historical Resolution Retrieval  
-↓  
-Draft Reply Generation  
-↓  
-AUTO_HANDLE / ESCALATE  
-↓  
+```text
+Customer Message
+      ↓
+Intent Classification
+      ↓
+Historical Resolution Retrieval
+      ↓
+Draft Reply Generation
+      ↓
+AUTO_HANDLE / ESCALATE
+      ↓
 Reason for Decision
+```
+
+---
 
 ## Dataset
 
@@ -56,6 +62,12 @@ dataset, producing **43,092 customer-message / brand-reply pairs**.
 A reproducible sample of 300 Spotify interactions was then created for
 analysis and intent discovery.
 
+The full raw `twcs.csv` dataset is intentionally excluded from the Git
+repository because of its size. The extracted Spotify interaction data
+required by the prototype is included.
+
+---
+
 ## Intent Taxonomy
 
 Seven support intents were defined after reviewing the Spotify support
@@ -70,6 +82,8 @@ sample:
 | `CONTENT_AVAILABILITY` | Missing songs, albums, artists, regional availability, and licensing-related issues |
 | `FEATURE_REQUEST` | Requests for new features, changes, integrations, or device/platform support |
 | `OTHER` | Messages without a clear support issue or that do not fit the other categories |
+
+---
 
 ## Golden Evaluation Set
 
@@ -106,6 +120,17 @@ standard support information.
 
 `ESCALATE` is used when the issue requires account-specific investigation,
 contains billing/refund/security risk, or otherwise requires human support.
+
+### Sampling and Labeling Note
+
+The golden examples were sampled reproducibly from the Spotify support
+sample and reviewed using a fixed intent and escalation rubric.
+
+The taxonomy and evaluation examples were derived from the same initial
+Spotify sample. This creates a potential evaluation-design limitation and
+is explicitly considered when interpreting the reported results.
+
+---
 
 ## Intent Classification
 
@@ -168,6 +193,12 @@ The keyword baseline and Logistic Regression results come from different
 evaluation setups and therefore should not be interpreted as a direct
 like-for-like model comparison.
 
+The runnable end-to-end demo currently uses the lightweight keyword
+classifier. The Logistic Regression model is retained as a separate
+evaluated experiment.
+
+---
+
 ## Historical Resolution Retrieval
 
 Historical Spotify support conversations are retrieved using a hybrid
@@ -193,6 +224,8 @@ similarity does not fully understand the meaning of the word "twice".
 This is retained as a documented failure case rather than hidden through
 test-specific tuning.
 
+---
+
 ## Escalation Decision
 
 The system predicts one of two actions:
@@ -214,11 +247,14 @@ Examples that may require escalation include:
 On the 200-example golden set:
 
 - **Escalation accuracy: 69%**
+- **Escalation Macro-F1: 0.475**
 - **ESCALATE recall: approximately 8%**
 
 Although overall accuracy appears reasonable, the very low recall for
-ESCALATE is an important weakness and makes unrestricted automatic
+`ESCALATE` is an important weakness and makes unrestricted automatic
 handling inappropriate for the current prototype.
+
+---
 
 ## Reply Generation
 
@@ -233,9 +269,7 @@ For sensitive or account-specific issues, the reply directs the customer
 toward private or human support rather than requesting sensitive
 information publicly.
 
-Example:
-
-Customer message:
+Example customer message:
 
 > "I was charged twice for Spotify Premium."
 
@@ -243,7 +277,7 @@ System output:
 
 - **Intent:** `BILLING_SUBSCRIPTION`
 - **Action:** `ESCALATE`
-- **Reason:** Possible duplicate billing charge requiring account-specific investigation.
+- **Reason:** Billing or refund issue may require access to account-specific payment information.
 
 Example draft reply:
 
@@ -261,24 +295,49 @@ Therefore, this prototype should not be described as a fully grounded
 retrieval-augmented generation system. Improving evidence-conditioned
 generation is a major next step.
 
+---
+
+## Automated End-to-End Evaluation
+
+The end-to-end evaluation harness was run on all **200 golden examples**.
+
+### Intent Results
+
+- **Accuracy: 48.0%**
+- **Macro-F1: 0.493**
+
+### Escalation Results
+
+- **Accuracy: 69.0%**
+- **Macro-F1: 0.475**
+- **AUTO_HANDLE recall: 99%**
+- **ESCALATE recall: 8%**
+
+These results show why accuracy alone is not sufficient for evaluating
+the escalation component.
+
+---
+
 ## Reply Quality Evaluation
 
 Generated support replies are evaluated on five dimensions using a
 1-to-5 rubric:
 
-1. **Relevance** - Does the reply address the customer's issue?
-2. **Groundedness** - Is the reply supported by the available context and
+1. **Relevance** – Does the reply address the customer's issue?
+2. **Groundedness** – Is the reply supported by the available context and
    historical support information?
-3. **Helpfulness** - Does the reply provide a useful resolution or next step?
-4. **Style** - Is the response clear, concise, and professional?
-5. **Safety** - Does the reply handle sensitive/account-specific issues
+3. **Helpfulness** – Does the reply provide a useful resolution or next step?
+4. **Style** – Is the response clear, concise, and professional?
+5. **Safety** – Does the reply handle sensitive/account-specific issues
    appropriately?
+
+---
 
 ## Manual Review
 
 A 30-example subset was reviewed using the fixed five-dimension rubric.
 
-Current average manual scores:
+Average manual scores:
 
 | Dimension | Average / 5 |
 |---|---:|
@@ -288,43 +347,68 @@ Current average manual scores:
 | Style | 4.97 |
 | Safety | 4.20 |
 
-The manual review indicates that the prototype generally produces clean
-and safe responses, while helpfulness and grounding remain areas for
-improvement.
+The manual review suggests that the prototype is generally safe and
+stylistically consistent, while helpfulness and evidence grounding remain
+important areas for improvement.
+
+---
 
 ## LLM-as-a-Judge
 
 Gemini is used as an automated reply-quality judge using the same five
 dimensions.
 
-The LLM judge receives the customer message, historical Spotify support
-reply, and generated draft reply. It returns a 1-to-5 score for each
-dimension together with a short explanation.
+The LLM judge receives:
 
-The LLM scores are compared with the manual ratings using:
+- Customer message
+- Historical Spotify support reply
+- Generated draft reply
 
-- Exact score agreement
-- Agreement within +/- 1 point
-- Mean Absolute Error (MAE)
-- Spearman rank correlation
+It returns a 1-to-5 score for each evaluation dimension together with a
+short explanation.
 
-The LLM evaluation is designed as an additional evaluation signal rather
-than a replacement for manual review.
+All **30/30 examples** were successfully evaluated by the LLM judge.
 
-### Interim Judge Agreement
+### Final LLM Judge Scores
 
-At the time of the current evaluation, 19 of the 30 examples have
-successfully completed LLM judging because of API free-tier rate limits.
+| Dimension | Average / 5 |
+|---|---:|
+| Relevance | 1.73 |
+| Groundedness | 3.23 |
+| Helpfulness | 1.70 |
+| Style | 2.87 |
+| Safety | 4.80 |
 
-Interim agreement on those 19 examples:
+The relatively high safety score and lower relevance/helpfulness scores
+are consistent with a system that tends to produce conservative but
+generic template responses.
 
-- **Exact agreement:** 26.3%
-- **Within +/- 1 agreement:** 61.1%
-- **Mean Absolute Error:** 1.27
-- **Spearman correlation:** 0.42
+### Human vs LLM Judge Agreement
 
-These are interim results and should be replaced with the final 30-example
-results once all LLM evaluations are complete.
+The LLM scores were compared with the manual ratings using exact
+agreement, agreement within one point, Mean Absolute Error, and Spearman
+rank correlation.
+
+| Metric | Exact Agreement | Within +/- 1 | MAE | Spearman |
+|---|---:|---:|---:|---:|
+| Relevance | 13.3% | 43.3% | 1.500 | 0.612 |
+| Groundedness | 13.3% | 56.7% | 1.367 | 0.285 |
+| Helpfulness | 26.7% | 80.0% | 0.933 | 0.478 |
+| Style | 13.3% | 43.3% | 2.100 | 0.243 |
+| Safety | 60.0% | 76.7% | 0.667 | 0.416 |
+
+Overall agreement:
+
+- **Exact agreement: 25.3%**
+- **Within +/- 1 agreement: 60.0%**
+- **Mean Absolute Error: 1.31**
+- **Spearman correlation: 0.43**
+
+The overall Spearman correlation indicates moderate rank association,
+but exact agreement is low. Therefore, the LLM judge is treated as an
+additional evaluation signal rather than a replacement for manual review.
+
+---
 
 ## What Is Misleading About My Headline Number?
 
@@ -332,15 +416,15 @@ The headline metrics can make the prototype appear stronger than it
 actually is.
 
 For example, the escalation component achieves approximately **69%
-overall accuracy**. However, the golden set contains 134 AUTO_HANDLE
-examples and only 66 ESCALATE examples.
+overall accuracy**. However, the golden set contains 134 `AUTO_HANDLE`
+examples and only 66 `ESCALATE` examples.
 
-More importantly, recall for the ESCALATE class is only approximately
+More importantly, recall for the `ESCALATE` class is only approximately
 **8%**.
 
 Therefore, the 69% accuracy hides a serious weakness: many requests that
 should be sent to a human agent are incorrectly classified as
-AUTO_HANDLE.
+`AUTO_HANDLE`.
 
 This matters especially for billing, account-access, refund, and security
 issues, where incorrectly auto-handling a request can be more costly than
@@ -356,36 +440,74 @@ The evaluation dataset is also small. In addition, the intent taxonomy
 and golden examples were developed from the same initial Spotify sample,
 which introduces a potential evaluation-design limitation.
 
+The LLM-as-a-Judge results also require caution. Exact agreement with the
+manual ratings is only 25.3%, so the LLM scores should not be interpreted
+as objective ground truth.
+
 For these reasons, the reported numbers should be treated as prototype
 evaluation results rather than estimates of production performance.
 
-## Top Failure Modes
+---
 
-Five important failure modes were identified:
+## Top 5 Failure Modes
 
-1. **Lexical ambiguity in retrieval**  
-   TF-IDF can confuse words with different meanings. For example,
-   "charged twice" can retrieve conversations about the artist TWICE.
+### 1. Lexical Ambiguity in Retrieval
 
-2. **Overlapping intent categories**  
-   FEATURE_REQUEST, CONTENT_AVAILABILITY, and PLAYBACK_TECHNICAL can
-   contain similar language and are sometimes confused.
+TF-IDF can confuse words with different meanings.
 
-3. **Limited minority-class data**  
-   Intents such as DOWNLOAD_OFFLINE have relatively few labelled
-   examples, resulting in weak held-out performance.
+Example:
 
-4. **Low ESCALATE recall**  
-   The rule-based escalation policy misses many cases that should receive
-   human review.
+> "I was charged twice for Spotify Premium."
 
-5. **Safe but generic replies**  
-   Template-based responses are often stylistically clean but may not
-   fully address the customer's specific context or previous
-   troubleshooting attempts.
+The retriever can return conversations about the artist **TWICE** rather
+than duplicate billing.
 
-More detailed examples and hypotheses are documented in
-`failure_analysis.md`.
+**Hypothesis:** lexical similarity captures shared words but not enough
+semantic context.
+
+### 2. Overlapping Intent Categories
+
+`FEATURE_REQUEST`, `CONTENT_AVAILABILITY`, and `PLAYBACK_TECHNICAL` can
+contain similar language and are sometimes confused.
+
+**Hypothesis:** the small labelled dataset does not contain enough examples
+to learn clear boundaries between related support intents.
+
+### 3. Limited Minority-Class Data
+
+Intents such as `DOWNLOAD_OFFLINE` have relatively few labelled examples.
+
+In the held-out Logistic Regression evaluation, `DOWNLOAD_OFFLINE`
+received an F1 score of 0.00.
+
+**Hypothesis:** sparse examples make minority-class patterns difficult to
+learn reliably.
+
+### 4. Low ESCALATE Recall
+
+The rule-based escalation policy achieves only approximately **8% recall**
+for the `ESCALATE` class.
+
+**Hypothesis:** the current escalation rules cover only a limited set of
+explicit risk phrases and miss less obvious account-specific cases.
+
+### 5. Safe but Generic Replies
+
+Template-based responses are often safe and predictable but may not fully
+address the customer's specific context or previous troubleshooting
+attempts.
+
+This is also reflected in the LLM judge's relatively high safety score
+(**4.80/5**) and low helpfulness score (**1.70/5**).
+
+**Hypothesis:** the reply generator does not yet deeply condition its
+response on retrieved historical resolutions.
+
+More detailed failure analysis is available in:
+
+`data/failure_analysis.md`
+
+---
 
 ## One-More-Week Plan
 
@@ -399,13 +521,72 @@ With one additional week, the priorities would be:
 4. Add intent-aware semantic retrieval to reduce lexical retrieval errors.
 5. Make reply generation genuinely evidence-conditioned on retrieved
    historical resolutions.
-6. Improve ESCALATE recall using confidence-aware and conservative
+6. Improve `ESCALATE` recall using confidence-aware and conservative
    routing.
 7. Expand human and LLM evaluation and test the complete repository from
    a clean environment.
 
 The goal would be to improve reliability and evaluation quality before
 adding additional product features.
+
+---
+
+## Decision Log
+
+A 15-entry decision log documents the major implementation and evaluation
+choices made during the project, including:
+
+- Spotify brand selection
+- Dataset subsampling
+- Golden-set construction
+- Intent taxonomy design
+- Baseline selection
+- TF-IDF + Logistic Regression experiment
+- Hybrid historical-reply retrieval
+- Escalation rules
+- Controlled reply templates
+- Evaluation methodology
+
+See:
+
+`data/decision_log.md`
+
+---
+
+## Repository Structure
+
+```text
+hiver-sde-assignment/
+│
+├── README.md
+├── requirements.txt
+├── .gitignore
+│
+└── data/
+    ├── analyze_data.py
+    ├── baseline_intent.py
+    ├── intent_classifier.py
+    ├── reply_retrieval.py
+    ├── escalation.py
+    ├── reply_generator.py
+    ├── support_agent.py
+    ├── evaluate_agent.py
+    ├── reply_judge.py
+    ├── compare_judges.py
+    ├── golden_set.csv
+    ├── spotify_pairs.csv
+    ├── spotify_sample_300.csv
+    ├── human_eval_30_with_replies.csv
+    ├── llm_judge_results.csv
+    ├── judge_agreement_summary.csv
+    ├── failure_analysis.md
+    └── decision_log.md
+```
+
+The original `twcs.csv` dataset is not committed because of its large file
+size.
+
+---
 
 ## How to Run
 
@@ -424,3 +605,108 @@ requiring GPU training.
 ```bash
 git clone https://github.com/guthasamatha/hiver-sde-assignment.git
 cd hiver-sde-assignment
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Move to the Data Directory
+
+```bash
+cd data
+```
+
+### 4. Run the End-to-End Support Agent
+
+```bash
+python support_agent.py
+```
+
+This demonstrates:
+
+- Intent prediction
+- Historical reply retrieval
+- Escalation decision
+- Draft reply generation
+- Escalation reason
+
+### 5. Run Intent Baselines
+
+```bash
+python baseline_intent.py
+```
+
+### 6. Run the TF-IDF + Logistic Regression Experiment
+
+```bash
+python intent_classifier.py
+```
+
+### 7. Run the Automated Evaluation Harness
+
+```bash
+python evaluate_agent.py
+```
+
+This evaluates intent classification and escalation decisions against the
+200-example golden set.
+
+### 8. Run Human-vs-LLM Judge Agreement
+
+The repository already contains the completed LLM judge results, so the
+agreement calculation can be reproduced without an API key:
+
+```bash
+python compare_judges.py
+```
+
+### 9. Optional: Re-run Gemini LLM-as-a-Judge
+
+To generate fresh LLM judge scores, set a Gemini API key in the
+`GEMINI_API_KEY` environment variable and run:
+
+```bash
+python reply_judge.py
+```
+
+The LLM judge is optional for reproducing the stored headline results
+because the completed judge output is included in the repository.
+
+---
+
+## Key Results Summary
+
+| Component | Result |
+|---|---:|
+| Majority intent baseline | 23.5% accuracy |
+| Keyword intent baseline | 48.0% accuracy |
+| TF-IDF + Logistic Regression | 48.0% accuracy, 0.43 Macro-F1 |
+| End-to-end intent evaluation | 48.0% accuracy, 0.493 Macro-F1 |
+| Escalation | 69.0% accuracy, 0.475 Macro-F1 |
+| ESCALATE recall | 8% |
+| LLM judge completion | 30/30 |
+| Human-LLM exact agreement | 25.3% |
+| Human-LLM within +/- 1 | 60.0% |
+| Human-LLM MAE | 1.31 |
+| Human-LLM Spearman | 0.43 |
+
+---
+
+## Main Limitation
+
+The current prototype is deliberately lightweight.
+
+Its most important limitation is that historical conversations are
+retrieved, but draft replies are still largely generated using controlled
+intent/action templates rather than being deeply conditioned on the
+retrieved resolution.
+
+As a result, the system demonstrates the full support-agent pipeline and
+evaluation framework, but it should not be interpreted as a
+production-ready retrieval-augmented customer-support system.
+
+The low `ESCALATE` recall is another important deployment blocker and
+would need to be improved before allowing unrestricted automatic handling.

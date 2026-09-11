@@ -1,6 +1,6 @@
 metric,examples,exact_agreement,within_1_agreement,mae,spearman
-relevance,19,0.158,0.421,1.526,0.565
-groundedness,19,0.105,0.526,1.474,0.207
-helpfulness,19,0.368,0.737,0.895,0.391
-style,19,0.105,0.526,1.842,
-safety,19,0.579,0.842,0.632,0.384
+relevance,30,0.133,0.433,1.5,0.612
+groundedness,30,0.133,0.567,1.367,0.285
+helpfulness,30,0.267,0.8,0.933,0.478
+style,30,0.133,0.433,2.1,0.243
+safety,30,0.6,0.767,0.667,0.416
