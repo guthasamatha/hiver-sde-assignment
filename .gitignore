@@ -1,0 +1,16 @@
+# Large raw dataset
+data/twcs.csv
+
+# Python cache
+__pycache__/
+*.pyc
+
+# API keys / environment files
+.env
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
